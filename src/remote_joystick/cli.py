@@ -11,6 +11,7 @@ from remote_joystick.logging_config import configure_logging
 from remote_joystick.output.debug import DebugOutputDevice
 from remote_joystick.output.vigem import ViGEmOutputDevice
 from remote_joystick.services.bridge import BridgeService
+from remote_joystick.services.sender_service import SenderService
 from remote_joystick.transport.receiver import UDPReceiver
 from remote_joystick.transport.sender import UDPSender
 
@@ -64,8 +65,8 @@ def sender(args: argparse.Namespace) -> int:
     config = _load_config(args.config)
     configure_logging(config.application.log_level)
     input_device = WindowsJoystickInputDevice()
-    debug_output = DebugOutputDevice()
-    bridge = BridgeService(input_device, debug_output)
+    sender_transport = UDPSender(config.network.target_host, config.network.port, config.security.shared_key.encode("utf-8"))
+    sender_service = SenderService(input_device)
     try:
         devices = input_device.list_devices()
         if not devices:
@@ -74,12 +75,16 @@ def sender(args: argparse.Namespace) -> int:
 
         for device in devices:
             try:
-                state = bridge.write_next(device.channel)
-                print(json.dumps({"channel": device.channel, "name": state.name, "axes": state.axes, "buttons": state.buttons, "povs": state.povs}, default=str))
+                message = sender_service.send_next(device.channel)
+                if message is None:
+                    continue
+                sender_transport.send(message)
+                print(json.dumps({"channel": device.channel, "device_id": message.device_id, "sequence": message.sequence, "axes": message.axes, "buttons": message.buttons, "povs": message.povs}, default=str))
             except ValueError as exc:
                 print(f"Skipping channel {device.channel}: {exc}")
     finally:
-        bridge.close()
+        sender_transport.close()
+        sender_service.close()
     return 0
 
 
@@ -88,11 +93,16 @@ def receiver(args: argparse.Namespace) -> int:
     configure_logging(config.application.log_level)
     receiver_transport = UDPReceiver(config.network.bind_host, config.network.port, config.security.shared_key.encode("utf-8"))
     output_device = ViGEmOutputDevice(device_id=1)
+    print(f"Listening for UDP packets on {config.network.bind_host}:{config.network.port} ...")
     try:
-        packet = receiver_transport.recv(timeout=0.1)
-        if packet is None:
-            print("No UDP packet received yet.")
-        else:
+        while True:
+            try:
+                packet = receiver_transport.recv(timeout=1.0)
+            except KeyboardInterrupt:
+                print("Receiver stopped by user.")
+                break
+            if packet is None:
+                continue
             print(packet)
             output_device.reset_to_safe_state("packet received")
     finally:
