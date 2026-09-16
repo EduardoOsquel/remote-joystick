@@ -76,24 +76,13 @@ class WindowsJoystickInputDevice(InputDevice):
 
     @staticmethod
     def _deduplicate_devices(devices: list[DeviceIdentity]) -> list[DeviceIdentity]:
-        unique: list[DeviceIdentity] = []
-        seen: set[tuple[str, str, str, int, int, int]] = set()
+        """Keep every discovered Windows device visible.
 
-        for device in devices:
-            signature = (
-                (device.name or "").strip().lower(),
-                (device.vendor_id or "").strip(),
-                (device.product_id or "").strip(),
-                device.axis_count,
-                device.button_count,
-                device.pov_count,
-            )
-            if signature in seen:
-                continue
-            seen.add(signature)
-            unique.append(device)
-
-        return unique
+        The WinMM enumeration can legitimately return multiple devices with the same
+        name and feature set when several identical HID controllers are attached.
+        These are distinct real inputs, not duplicates, so we must not collapse them.
+        """
+        return list(devices)
 
     def __init__(self) -> None:
         self._devices: list[DeviceIdentity] = []

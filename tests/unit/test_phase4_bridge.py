@@ -25,7 +25,7 @@ def test_windows_input_device_reports_unique_devices() -> None:
     assert len(signatures) == len(devices)
 
 
-def test_windows_input_device_deduplicates_identical_devices() -> None:
+def test_windows_input_device_keeps_duplicate_identifiers_when_they_are_real_devices() -> None:
     devices = [
         DeviceIdentity(name="Controla. Microsoft PC-joystick", persistent_id="windows:0", physical_id="windows:0", channel=1, vendor_id="1103", product_id="45322", axis_count=4, button_count=16, pov_count=1, source="windows"),
         DeviceIdentity(name="Controla. Microsoft PC-joystick", persistent_id="windows:1", physical_id="windows:1", channel=2, vendor_id="4660", product_id="48813", axis_count=6, button_count=25, pov_count=1, source="windows"),
@@ -34,8 +34,8 @@ def test_windows_input_device_deduplicates_identical_devices() -> None:
 
     deduped = WindowsJoystickInputDevice._deduplicate_devices(devices)
 
-    assert [device.channel for device in deduped] == [1, 2]
-    assert len(deduped) == 2
+    assert [device.channel for device in deduped] == [1, 2, 3]
+    assert len(deduped) == 3
 
 
 def test_vjoy_backend_loads_x64_dll_location(monkeypatch) -> None:
