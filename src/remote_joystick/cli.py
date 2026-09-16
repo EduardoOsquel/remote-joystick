@@ -6,7 +6,7 @@ import sys
 
 from remote_joystick.config import Config
 from remote_joystick.input.simulator import SimulatorInputDevice
-from remote_joystick.input.windows import WindowsJoystickInputDevice
+from remote_joystick.input.windows_pygame import WindowsJoystickInputDevice
 from remote_joystick.logging_config import configure_logging
 from remote_joystick.output.debug import DebugOutputDevice
 from remote_joystick.output.vigem import ViGEmOutputDevice
