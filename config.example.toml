@@ -1,0 +1,48 @@
+[application]
+mode = "sender"
+log_level = "INFO"
+
+[network]
+bind_host = "0.0.0.0"
+target_host = "100.x.x.x"
+port = 26760
+send_rate_hz = 125
+heartbeat_ms = 250
+timeout_ms = 750
+max_packet_age_ms = 500
+
+[security]
+shared_key = "CAMBIAR_POR_UNA_CLAVE_SEGURA"
+
+[[joysticks]]
+channel = 1
+physical_device_id = "DEVICE_ID_A"
+vjoy_device_id = 1
+disconnect_axis_value = 0.0
+disconnect_throttle_value = -1.0
+
+[[joysticks]]
+channel = 2
+physical_device_id = "DEVICE_ID_B"
+vjoy_device_id = 2
+disconnect_axis_value = 0.0
+disconnect_throttle_value = -1.0
+
+[[joysticks.mapping.axes]]
+physical_axis = 0
+vjoy_axis = 0
+invert = false
+dead_zone = 0.05
+min_dead_zone = 0.0
+max_dead_zone = 0.0
+saturation = 1.0
+curve = "linear"
+
+[[joysticks.mapping.buttons]]
+physical_button = 0
+vjoy_button = 1
+
+[[joysticks.mapping.povs]]
+physical_pov = 0
+vjoy_pov = 0
+safe_value = -1
