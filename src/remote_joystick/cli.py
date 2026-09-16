@@ -6,7 +6,11 @@ import sys
 
 from remote_joystick.config import Config
 from remote_joystick.input.simulator import SimulatorInputDevice
+from remote_joystick.input.windows import WindowsJoystickInputDevice
 from remote_joystick.logging_config import configure_logging
+from remote_joystick.output.debug import DebugOutputDevice
+from remote_joystick.output.vjoy import VJoyOutputDevice
+from remote_joystick.services.bridge import BridgeService
 from remote_joystick.transport.receiver import UDPReceiver
 from remote_joystick.transport.sender import UDPSender
 
@@ -19,30 +23,44 @@ def _load_config(path: str | None) -> Config:
 
 
 def list_inputs(_args: argparse.Namespace) -> int:
-    sim = SimulatorInputDevice(device_count=2)
-    for device in sim.list_devices():
-        print(device)
-    sim.close()
+    input_device = WindowsJoystickInputDevice()
+    devices = input_device.list_devices()
+    if not devices:
+        print("No Windows joystick devices detected.")
+    else:
+        for device in devices:
+            print(device)
+    input_device.close()
     return 0
 
 
 def list_vjoy(_args: argparse.Namespace) -> int:
-    print("No vJoy devices are configured or available in this scaffold build.")
+    output_device = VJoyOutputDevice(device_id=1)
+    print(f"vJoy output backend initialized: {type(output_device.backend).__name__}")
+    print("The actual vJoy DLL is still a manual installation requirement on the receiver machine.")
     return 0
 
 
 def sender(args: argparse.Namespace) -> int:
     config = _load_config(args.config)
     configure_logging(config.application.log_level)
-    sender_transport = UDPSender(config.network.target_host, config.network.port, config.security.shared_key.encode("utf-8"))
-    sim = SimulatorInputDevice(device_count=2)
+    input_device = WindowsJoystickInputDevice()
+    debug_output = DebugOutputDevice()
+    bridge = BridgeService(input_device, debug_output)
     try:
-        for channel in (1, 2):
-            state = sim.read_state(channel)
-            print(json.dumps({"channel": channel, "axes": state.axes, "buttons": state.buttons, "povs": state.povs}, default=str))
+        devices = input_device.list_devices()
+        if not devices:
+            print("No Windows joystick devices detected for sending.")
+            return 0
+
+        for device in devices:
+            try:
+                state = bridge.write_next(device.channel)
+                print(json.dumps({"channel": device.channel, "name": state.name, "axes": state.axes, "buttons": state.buttons, "povs": state.povs}, default=str))
+            except ValueError as exc:
+                print(f"Skipping channel {device.channel}: {exc}")
     finally:
-        sim.close()
-        sender_transport.close()
+        bridge.close()
     return 0
 
 
@@ -50,11 +68,17 @@ def receiver(args: argparse.Namespace) -> int:
     config = _load_config(args.config)
     configure_logging(config.application.log_level)
     receiver_transport = UDPReceiver(config.network.bind_host, config.network.port, config.security.shared_key.encode("utf-8"))
+    output_device = VJoyOutputDevice(device_id=1)
     try:
         packet = receiver_transport.recv(timeout=0.1)
-        print(packet)
+        if packet is None:
+            print("No UDP packet received yet.")
+        else:
+            print(packet)
+            output_device.reset_to_safe_state("packet received")
     finally:
         receiver_transport.close()
+        output_device.close()
     return 0
 
 
