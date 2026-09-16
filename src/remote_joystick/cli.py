@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 
 from remote_joystick.config import Config
 from remote_joystick.input.simulator import SimulatorInputDevice
@@ -67,21 +68,29 @@ def sender(args: argparse.Namespace) -> int:
     input_device = WindowsJoystickInputDevice()
     sender_transport = UDPSender(config.network.target_host, config.network.port, config.security.shared_key.encode("utf-8"))
     sender_service = SenderService(input_device)
+    interval = 1.0 / max(float(config.network.send_rate_hz), 1.0)
     try:
         devices = input_device.list_devices()
         if not devices:
             print("No Windows joystick devices detected for sending.")
             return 0
 
-        for device in devices:
-            try:
-                message = sender_service.send_next(device.channel)
-                if message is None:
-                    continue
-                sender_transport.send(message)
-                print(json.dumps({"channel": device.channel, "device_id": message.device_id, "sequence": message.sequence, "axes": message.axes, "buttons": message.buttons, "povs": message.povs}, default=str))
-            except ValueError as exc:
-                print(f"Skipping channel {device.channel}: {exc}")
+        while True:
+            for device in devices:
+                try:
+                    message = sender_service.send_next(device.channel)
+                    if message is None:
+                        continue
+                    sender_transport.send(message)
+                    if args.once:
+                        print(json.dumps({"channel": device.channel, "device_id": message.device_id, "sequence": message.sequence, "axes": message.axes, "buttons": message.buttons, "povs": message.povs}, default=str))
+                except ValueError as exc:
+                    print(f"Skipping channel {device.channel}: {exc}")
+            if args.once:
+                break
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("Sender stopped by user.")
     finally:
         sender_transport.close()
         sender_service.close()
@@ -144,6 +153,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     cmd = subparsers.add_parser("sender")
     cmd.add_argument("--config", default="config.toml")
+    cmd.add_argument("--once", action="store_true", help="Send a single snapshot instead of streaming continuously")
     cmd.set_defaults(func=sender)
 
     cmd = subparsers.add_parser("receiver")
