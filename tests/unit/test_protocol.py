@@ -81,3 +81,22 @@ def test_version_rejected(signer):
     tampered[5] = 99
     with pytest.raises(ValueError):
         decode_packet(bytes(tampered), signer)
+
+
+def test_sequence_must_fit_32bit_unsigned_range(signer):
+    message = JoystickMessage(
+        version=1,
+        message_type=PacketType.STATE,
+        session_id=42,
+        sender_id=7,
+        channel=1,
+        device_id="device-A",
+        sequence=2**32,
+        timestamp_ms=1234,
+        axes=[0.0],
+        buttons=[True],
+        povs=[0],
+        key=b"test-shared-key",
+    )
+    with pytest.raises(ValueError, match="sequence exceeds protocol limit"):
+        encode_packet(message, signer)

@@ -183,11 +183,12 @@ class WindowsJoystickInputDevice(InputDevice):
             pov = [-1]
             if state.dwPOV != 0xFFFF:
                 pov = [int(state.dwPOV)]
+            sequence = int(time.time_ns() % (2**32))
             return WindowsJoystickState(
                 logical_id=device.physical_id,
                 physical_id=device.physical_id,
                 name=device.name,
-                sequence=int(time.time() * 1000),
+                sequence=sequence,
                 timestamp_ms=int(time.time() * 1000),
                 axes=[axis for axis in axes[: max(device.axis_count, 1)]],
                 buttons=buttons,

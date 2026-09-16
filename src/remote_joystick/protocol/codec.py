@@ -28,6 +28,16 @@ def encode_packet(message: JoystickMessage, signer: HMACSigner) -> bytes:
         raise ValueError("too many buttons for protocol")
     if len(message.povs) > 4:
         raise ValueError("too many povs for protocol")
+    if not 0 <= message.session_id <= 255:
+        raise ValueError("session_id must fit in a single byte")
+    if not 0 <= message.sender_id <= 4294967295:
+        raise ValueError("sender_id exceeds protocol limit")
+    if not 0 <= message.channel <= 255:
+        raise ValueError("channel must fit in a single byte")
+    if not 0 <= message.sequence <= 4294967295:
+        raise ValueError("sequence exceeds protocol limit")
+    if not 0 <= message.timestamp_ms <= 18446744073709551615:
+        raise ValueError("timestamp_ms exceeds protocol limit")
     if message.version != VERSION:
         raise ValueError("Unsupported protocol version")
 
