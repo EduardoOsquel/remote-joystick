@@ -21,40 +21,66 @@ VJOY_AXIS_SL1 = 0x37
 class VJoyBackend:
     """Real vJoy backend binding for the receiver side."""
 
+    @property
+    def is_available(self) -> bool:
+        return self._lib is not None and self._api_available
+
+    @property
+    def status_message(self) -> str:
+        if self._lib is None:
+            return "The actual vJoy DLL is still a manual installation requirement on the receiver machine."
+        if not self._api_available:
+            return "The vJoy DLL was found but does not expose the expected API, which usually means an incompatible or incomplete installation."
+        return "vJoy DLL detected and available on the receiver machine."
+
     def __init__(self, device_id: int = 1) -> None:
         self.device_id = device_id
         self._lib: Any | None = None
         self._acquired = False
+        self._api_available = False
         self._load_library()
 
     def _load_library(self) -> None:
         if os.name != "nt":
             self._lib = None
+            self._api_available = False
             return
 
         candidate_paths = [
-            r"C:\vJoy\vJoyInterface.dll",
-            r"C:\Program Files\vJoy\vJoyInterface.dll",
-            r"C:\Program Files (x86)\vJoy\vJoyInterface.dll",
+            r"C:\Program Files\vJoy\x64\vJoyInterface.dll",
+            r"C:\Program Files\vJoy\x86\vJoyInterface.dll",
+            r"C:\Program Files (x86)\vJoy\x64\vJoyInterface.dll",
         ]
         for path in candidate_paths:
             if not os.path.exists(path):
                 continue
             try:
                 lib = ctypes.WinDLL(path)
-                lib.GetNumberOfVJD.restype = ctypes.c_int
-                lib.AcquireVJD.restype = ctypes.c_int
-                lib.ReleaseVJD.restype = ctypes.c_int
-                lib.SetAxis.restype = ctypes.c_int
-                lib.SetBtn.restype = ctypes.c_int
-                lib.SetDiscPov.restype = ctypes.c_int
-                lib.ResetVJD.restype = ctypes.c_int
+                required_symbols = [
+                    "GetNumberOfVJD",
+                    "AcquireVJD",
+                    "ReleaseVJD",
+                    "SetAxis",
+                    "SetBtn",
+                    "SetDiscPov",
+                    "ResetVJD",
+                ]
+                missing = [symbol for symbol in required_symbols if not hasattr(lib, symbol)]
+                if missing:
+                    self._lib = lib
+                    self._api_available = False
+                    return
+                for symbol in required_symbols:
+                    getattr(lib, symbol).restype = ctypes.c_int
                 self._lib = lib
+                self._api_available = True
                 return
             except (AttributeError, OSError):
                 self._lib = None
+                self._api_available = False
                 return
         self._lib = None
+        self._api_available = False
 
     def _ensure_acquired(self) -> bool:
         if self._lib is None:

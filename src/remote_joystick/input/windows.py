@@ -74,6 +74,27 @@ class _JOYCAPS(ctypes.Structure):
 class WindowsJoystickInputDevice(InputDevice):
     """Real Windows HID joystick adapter using the WinMM API."""
 
+    @staticmethod
+    def _deduplicate_devices(devices: list[DeviceIdentity]) -> list[DeviceIdentity]:
+        unique: list[DeviceIdentity] = []
+        seen: set[tuple[str, str, str, int, int, int]] = set()
+
+        for device in devices:
+            signature = (
+                (device.name or "").strip().lower(),
+                (device.vendor_id or "").strip(),
+                (device.product_id or "").strip(),
+                device.axis_count,
+                device.button_count,
+                device.pov_count,
+            )
+            if signature in seen:
+                continue
+            seen.add(signature)
+            unique.append(device)
+
+        return unique
+
     def __init__(self) -> None:
         self._devices: list[DeviceIdentity] = []
         self._winmm = None
@@ -125,7 +146,7 @@ class WindowsJoystickInputDevice(InputDevice):
                     source="windows",
                 )
             )
-        self._devices = devices
+        self._devices = self._deduplicate_devices(devices)
 
     def list_devices(self) -> list[DeviceIdentity]:
         return list(self._devices)

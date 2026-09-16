@@ -9,10 +9,14 @@ from remote_joystick.input.simulator import SimulatorInputDevice
 from remote_joystick.input.windows import WindowsJoystickInputDevice
 from remote_joystick.logging_config import configure_logging
 from remote_joystick.output.debug import DebugOutputDevice
-from remote_joystick.output.vjoy import VJoyOutputDevice
+from remote_joystick.output.vigem import ViGEmOutputDevice
 from remote_joystick.services.bridge import BridgeService
 from remote_joystick.transport.receiver import UDPReceiver
 from remote_joystick.transport.sender import UDPSender
+
+# Backward-compatible alias kept for existing tests and older code paths while the
+# active implementation is now ViGEmBus-oriented.
+VJoyOutputDevice = ViGEmOutputDevice
 
 
 def _load_config(path: str | None) -> Config:
@@ -34,10 +38,25 @@ def list_inputs(_args: argparse.Namespace) -> int:
     return 0
 
 
+def list_vigem(_args: argparse.Namespace) -> int:
+    output_device = ViGEmOutputDevice(device_id=1)
+    print(f"ViGEm output backend initialized: {type(output_device.backend).__name__}")
+    backend = output_device.backend
+    status = getattr(backend, "status_message", None)
+    if status is None:
+        status = "The ViGEmBus DLL is not installed on the receiver machine." if not getattr(backend, "is_available", True) else "ViGEmBus DLL detected and available on the receiver machine."
+    print(status)
+    return 0
+
+
 def list_vjoy(_args: argparse.Namespace) -> int:
     output_device = VJoyOutputDevice(device_id=1)
-    print(f"vJoy output backend initialized: {type(output_device.backend).__name__}")
-    print("The actual vJoy DLL is still a manual installation requirement on the receiver machine.")
+    print(f"ViGEm output backend initialized: {type(output_device.backend).__name__}")
+    backend = output_device.backend
+    status = getattr(backend, "status_message", None)
+    if status is None:
+        status = "The actual vJoy DLL is still a manual installation requirement on the receiver machine." if not getattr(backend, "is_available", True) else "vJoy DLL detected and available on the receiver machine."
+    print(status)
     return 0
 
 
@@ -68,7 +87,7 @@ def receiver(args: argparse.Namespace) -> int:
     config = _load_config(args.config)
     configure_logging(config.application.log_level)
     receiver_transport = UDPReceiver(config.network.bind_host, config.network.port, config.security.shared_key.encode("utf-8"))
-    output_device = VJoyOutputDevice(device_id=1)
+    output_device = ViGEmOutputDevice(device_id=1)
     try:
         packet = receiver_transport.recv(timeout=0.1)
         if packet is None:
@@ -91,7 +110,7 @@ def simulate(args: argparse.Namespace) -> int:
 
 
 def doctor(_args: argparse.Namespace) -> int:
-    print("Doctor checks are scaffolded; physical joystick and vJoy integration will be added in later phases.")
+    print("Doctor checks are scaffolded; physical joystick and ViGEmBus integration will be added in later phases.")
     return 0
 
 
@@ -106,6 +125,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     cmd = subparsers.add_parser("list-inputs")
     cmd.set_defaults(func=list_inputs)
+
+    cmd = subparsers.add_parser("list-vigem")
+    cmd.set_defaults(func=list_vigem)
 
     cmd = subparsers.add_parser("list-vjoy")
     cmd.set_defaults(func=list_vjoy)
