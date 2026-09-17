@@ -20,6 +20,9 @@ class _XUSB_REPORT(ctypes.Structure):
     ]
 
 
+VIGEM_ERROR_NONE = 0x20000000
+
+
 class ViGEmBusBackend:
     """ViGEmBus-backed output adapter for the receiver side.
 
@@ -144,14 +147,14 @@ class ViGEmBusBackend:
             if self._client is None:
                 return False
             connect = getattr(self._lib, "vigem_connect")
-            result = connect(self._client, 0x0000)
-            if result != 0:
+            result = connect(self._client)
+            if result != VIGEM_ERROR_NONE:
                 self._connected = False
                 return False
             target_factory = getattr(self._lib, "vigem_target_x360_alloc")
             self._target = target_factory()
             add_target = getattr(self._lib, "vigem_target_add")
-            if add_target(self._client, self._target) != 0:
+            if add_target(self._client, self._target) != VIGEM_ERROR_NONE:
                 self._connected = False
                 return False
             self._connected = True
