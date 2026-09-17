@@ -54,6 +54,28 @@ class ViGEmBusBackend:
         self._connected = False
         self._load_library()
 
+    def _configure_function_signatures(self) -> None:
+        if self._lib is None:
+            return
+
+        signatures = {
+            "vigem_alloc": (ctypes.c_void_p, []),
+            "vigem_connect": (ctypes.c_uint32, [ctypes.c_void_p]),
+            "vigem_disconnect": (None, [ctypes.c_void_p]),
+            "vigem_target_x360_alloc": (ctypes.c_void_p, []),
+            "vigem_target_free": (None, [ctypes.c_void_p]),
+            "vigem_target_add": (ctypes.c_uint32, [ctypes.c_void_p, ctypes.c_void_p]),
+            "vigem_target_remove": (ctypes.c_uint32, [ctypes.c_void_p, ctypes.c_void_p]),
+            "vigem_target_x360_update": (ctypes.c_uint32, [ctypes.c_void_p, ctypes.c_void_p, _XUSB_REPORT]),
+        }
+
+        for name, (restype, argtypes) in signatures.items():
+            func = getattr(self._lib, name, None)
+            if func is None:
+                continue
+            func.restype = restype
+            func.argtypes = argtypes
+
     def _load_library(self) -> None:
         if os.name != "nt":
             self._driver_present = False
@@ -125,6 +147,7 @@ class ViGEmBusBackend:
                     self._api_available = False
                     return
                 self._lib = lib
+                self._configure_function_signatures()
                 self._api_available = True
                 return
             except (AttributeError, OSError):
