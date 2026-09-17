@@ -8,6 +8,18 @@ from remote_joystick.models.device import DeviceState
 from remote_joystick.output.base import OutputDevice
 
 
+class _XUSB_REPORT(ctypes.Structure):
+    _fields_ = [
+        ("wButtons", ctypes.c_ushort),
+        ("bLeftTrigger", ctypes.c_ubyte),
+        ("bRightTrigger", ctypes.c_ubyte),
+        ("sThumbLX", ctypes.c_short),
+        ("sThumbLY", ctypes.c_short),
+        ("sThumbRX", ctypes.c_short),
+        ("sThumbRY", ctypes.c_short),
+    ]
+
+
 class ViGEmBusBackend:
     """ViGEmBus-backed output adapter for the receiver side.
 
@@ -149,9 +161,35 @@ class ViGEmBusBackend:
             return False
 
     def write_state(self, state: DeviceState) -> None:
-        if not self._ensure_connected():
+        if not self._ensure_connected() or self._lib is None or self._client is None or self._target is None:
             return
-        return None
+
+        report = _XUSB_REPORT()
+        report.wButtons = 0
+        report.bLeftTrigger = 0
+        report.bRightTrigger = 0
+
+        button_bits = [
+            0x0001, 0x0002, 0x0004, 0x0008,
+            0x0010, 0x0020, 0x0040, 0x0080,
+            0x0100, 0x0200, 0x0400, 0x1000,
+            0x2000, 0x4000, 0x8000, 0x0000,
+        ]
+        for index, pressed in enumerate(state.buttons[: len(button_bits)]):
+            if pressed and index < len(button_bits):
+                report.wButtons |= button_bits[index]
+
+        if len(state.axes) >= 1:
+            report.sThumbLX = int(max(-1.0, min(1.0, float(state.axes[0]))) * 32767)
+        if len(state.axes) >= 2:
+            report.sThumbLY = int(max(-1.0, min(1.0, float(state.axes[1]))) * 32767)
+        if len(state.axes) >= 3:
+            report.sThumbRX = int(max(-1.0, min(1.0, float(state.axes[2]))) * 32767)
+        if len(state.axes) >= 4:
+            report.sThumbRY = int(max(-1.0, min(1.0, float(state.axes[3]))) * 32767)
+
+        update = getattr(self._lib, "vigem_target_x360_update")
+        update(self._client, self._target, report)
 
     def reset_to_safe_state(self, reason: str) -> None:
         if self._lib is None or not self._api_available:
