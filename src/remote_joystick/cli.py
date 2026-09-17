@@ -12,6 +12,7 @@ from remote_joystick.logging_config import configure_logging
 from remote_joystick.output.debug import DebugOutputDevice
 from remote_joystick.output.vigem import ViGEmOutputDevice
 from remote_joystick.services.bridge import BridgeService
+from remote_joystick.services.receiver_service import ReceiverService
 from remote_joystick.services.sender_service import SenderService
 from remote_joystick.transport.receiver import UDPReceiver
 from remote_joystick.transport.sender import UDPSender
@@ -102,6 +103,7 @@ def receiver(args: argparse.Namespace) -> int:
     configure_logging(config.application.log_level)
     receiver_transport = UDPReceiver(config.network.bind_host, config.network.port, config.security.shared_key.encode("utf-8"))
     output_device = ViGEmOutputDevice(device_id=1)
+    receiver_service = ReceiverService(output_device)
     print(f"Listening for UDP packets on {config.network.bind_host}:{config.network.port} ...")
     try:
         while True:
@@ -113,10 +115,10 @@ def receiver(args: argparse.Namespace) -> int:
             if packet is None:
                 continue
             print(packet)
-            output_device.reset_to_safe_state("packet received")
+            receiver_service.handle_packet(packet)
     finally:
         receiver_transport.close()
-        output_device.close()
+        receiver_service.close()
     return 0
 
 
